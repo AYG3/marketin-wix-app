@@ -36,3 +36,19 @@ To switch to Postgres, set `DB_CLIENT=pg` and provide `DB_CONNECTION` environmen
 Token encryption
 
 - You should set `ENCRYPTION_KEY` in `.env` to a unique secret used to encrypt tokens at rest. If not set, tokens will be stored in plaintext (not recommended).
+
+Migrations
+
+- This scaffold uses Knex migrations for DB schema. Run migrations with:
+
+```bash
+npm run migrate
+# or run migrations for test environment
+npm run migrate:test
+```
+
+To rollback migrations in development, run:
+
+```bash
+npm run migrate:rollback
+```
