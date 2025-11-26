@@ -13,6 +13,19 @@ const config = {
   useNullAsDefault: true,
 };
 
+// Ensure DB directory exists (useful for sqlite3)
+const fs = require('fs');
+const path = require('path');
+if (client === 'sqlite3') {
+  const filename = (config.connection && config.connection.filename) || './data/dev.sqlite';
+  const dir = path.dirname(filename);
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    console.error('Could not create sqlite data dir', err);
+  }
+}
+
 const db = knex(config);
 
 // Helper: ensure our minimal schema exists - this is for development scaffolding only.
