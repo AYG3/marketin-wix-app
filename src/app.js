@@ -18,5 +18,6 @@ app.get('/', (req, res) => {
 // Mount routes
 app.use('/auth', routes.auth);
 app.use('/webhooks', routes.webhooks);
+app.use('/inject', routes.inject);
 
 module.exports = app;

@@ -68,6 +68,7 @@ describe('Wix OAuth endpoints', () => {
   test('on failure: injection_attempts = max retries, status = failed, injected=false', async () => {
     // arrange: make injectHeadScript fail
     const wixApi = require('../src/services/wixApi.service');
+    const originalImpl = wixApi.injectHeadScript.getMockImplementation();
     wixApi.injectHeadScript.mockImplementation(async () => { throw new Error('injection failed'); });
 
     await knex('wix_tokens').del();
@@ -79,6 +80,21 @@ describe('Wix OAuth endpoints', () => {
     expect(row.injection_attempts).toBeGreaterThanOrEqual(3);
     expect(row.injection_status).toBe('failed');
     expect(row.injected).toBeFalsy();
+    // restore impl
+    wixApi.injectHeadScript.mockImplementation(originalImpl);
+  });
+
+  test('POST /inject injects to provided site and updates DB', async () => {
+    // reset and prepare
+    await knex('wix_tokens').del();
+    // insert a token row for site so inject.service can fetch if not passing token
+    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: 'token', refresh_token: 'r', site_id: 'manual-site', created_at: new Date() });
+    const res = await request(app).post('/inject').send({ siteId: 'manual-site', token: 'manual-token' });
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('ok', true);
+    const row = await knex('wix_tokens').where({ site_id: 'manual-site' }).first();
+    expect(row.injected).toBeTruthy();
+    expect(row.injection_status).toBe('success');
   });
 });
 
