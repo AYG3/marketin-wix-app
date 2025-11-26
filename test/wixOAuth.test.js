@@ -88,13 +88,35 @@ describe('Wix OAuth endpoints', () => {
     // reset and prepare
     await knex('wix_tokens').del();
     // insert a token row for site so inject.service can fetch if not passing token
-    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: 'token', refresh_token: 'r', site_id: 'manual-site', created_at: new Date() });
+    const { encrypt } = require('../src/utils/crypto');
+    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: encrypt('token'), refresh_token: encrypt('r'), site_id: 'manual-site', created_at: new Date() });
     const res = await request(app).post('/inject').send({ siteId: 'manual-site', token: 'manual-token' });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('ok', true);
     const row = await knex('wix_tokens').where({ site_id: 'manual-site' }).first();
     expect(row.injected).toBeTruthy();
     expect(row.injection_status).toBe('success');
+  });
+
+  test('POST /wix/products/sync triggers sync, calls bulk API and returns mapping count', async () => {
+    // Setup: ensure wix_tokens exists
+    await knex('wix_tokens').del();
+    await knex('product_mappings').del();
+    const { encrypt } = require('../src/utils/crypto');
+    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: encrypt('token'), refresh_token: encrypt('r'), site_id: 'sync-site', created_at: new Date() });
+    // stub marketin bulk sync to return fake product mappings for each product passed
+    const marketin = require('../src/services/marketin.service');
+    marketin.bulkSyncProducts = jest.fn().mockImplementation(async ({ apiKey, brandId, products }) => ({ products: products.map((p, i) => ({ wix_id: p.id, id: `m-${i}` })) }));
+
+    const wixApi = require('../src/services/wixApi.service');
+    // return a couple of mock products
+    wixApi.getAllProducts = jest.fn().mockResolvedValue([{ id: 'w1', name: 'One', sku: 'W-1' }, { id: 'w2', name: 'Two', sku: 'W-2' }]);
+
+    const res = await request(app).post('/wix/products/sync').send({ siteId: 'sync-site', brandId: 123 });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBeTruthy();
+    const rows = await knex('product_mappings').select();
+    expect(rows.length).toBeGreaterThanOrEqual(2);
   });
 });
 

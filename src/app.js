@@ -19,5 +19,6 @@ app.get('/', (req, res) => {
 app.use('/auth', routes.auth);
 app.use('/webhooks', routes.webhooks);
 app.use('/inject', routes.inject);
+app.use('/wix', routes.wix);
 
 module.exports = app;

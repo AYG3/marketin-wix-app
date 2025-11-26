@@ -88,7 +88,60 @@ const injectHeadScript = async ({ siteId, token, content }) => {
   }
 };
 
+// Fetch all products with pagination from Wix Stores API
+const normalizeWixProduct = (p) => {
+  // Attempt to normalize common fields; adapt if real Wix shape differs
+  const id = p.id || p._id || p._uid || p.sku || String(p._id || p.id || p.uid || '');
+  const title = p.name || p.title || p.productName || p.titleText || '';
+  const variants = (p.variants || []).map((v) => ({
+    id: v.id || v._id || v.sku || null,
+    sku: v.sku || v.skuCode || null,
+    price: (v.price && v.price.amount) || v.price || null,
+    currency: (v.price && v.price.currency) || p.currency || 'USD',
+    inventoryQuantity: v.inventory && v.inventory.availableQuantity || v.quantity || null,
+  }));
+  const price = (p.price && p.price.amount) || (p.priceRange && p.priceRange.min) || (variants[0] && variants[0].price) || null;
+  const currency = (p.price && p.price.currency) || p.currency || (variants[0] && variants[0].currency) || 'USD';
+  const inventoryQuantity = (p.inventory && p.inventory.availableQuantity) || p.quantity || (variants[0] && variants[0].inventoryQuantity) || 0;
+  const image = (p.media && p.media.length && p.media[0].url) || (p.images && p.images[0] && p.images[0].url) || null;
+  const sku = p.sku || (variants[0] && variants[0].sku) || null;
+
+  return { id, title, sku, price, currency, inventoryQuantity, image, variants };
+};
+
+const getAllProducts = async (accessToken, { siteId, limit = 50 } = {}) => {
+  let products = [];
+  let offset = 0;
+  while (true) {
+    try {
+      const body = { limit, offset };
+      const endpoint = `https://www.wixapis.com/stores/v1/products/query`;
+      const resp = await axios.post(endpoint, body, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      const data = resp.data || {};
+      const items = data.products || data.items || data.results || [];
+      products.push(...items);
+      if (items.length < limit) break;
+      offset += items.length;
+    } catch (err) {
+      // If next token or paging style differs, attempt fallback to nextPageToken
+      const errMsg = err?.response?.data || err.message || err;
+      console.error('getAllProducts error', errMsg);
+      throw err;
+    }
+  }
+
+  // Normalize
+  const normalized = products.map(normalizeWixProduct);
+  return normalized;
+};
+
 module.exports = {
   exchangeCodeForToken,
   injectHeadScript,
+  getAllProducts,
 };
