@@ -23,8 +23,8 @@ npm run dev
 Endpoints
 
 - GET / -> health check
-- GET /auth/wix -> redirect to Wix OAuth (requires WIX_CLIENT_ID and WIX_REDIRECT_URI)
-- GET /auth/wix/callback -> handles OAuth callback and stores tokens in DB (mocked behavior)
+- GET /auth/install -> redirect to Wix OAuth (requires WIX_CLIENT_ID and WIX_REDIRECT_URI)
+- GET /auth/callback -> handles OAuth callback and stores tokens in DB (mocked behavior)
 - POST /webhooks/order -> accepts order webhooks and persists payload
 
 Database: SQLite (Knex)
