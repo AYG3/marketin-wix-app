@@ -90,20 +90,36 @@ const injectHeadScript = async ({ siteId, token, content }) => {
 
 // Fetch all products with pagination from Wix Stores API
 const normalizeWixProduct = (p) => {
-  // Attempt to normalize common fields; adapt if real Wix shape differs
-  const id = p.id || p._id || p._uid || p.sku || String(p._id || p.id || p.uid || '');
-  const title = p.name || p.title || p.productName || p.titleText || '';
-  const variants = (p.variants || []).map((v) => ({
-    id: v.id || v._id || v.sku || null,
-    sku: v.sku || v.skuCode || null,
-    price: (v.price && v.price.amount) || v.price || null,
-    currency: (v.price && v.price.currency) || p.currency || 'USD',
-    inventoryQuantity: v.inventory && v.inventory.availableQuantity || v.quantity || null,
-  }));
-  const price = (p.price && p.price.amount) || (p.priceRange && p.priceRange.min) || (variants[0] && variants[0].price) || null;
-  const currency = (p.price && p.price.currency) || p.currency || (variants[0] && variants[0].currency) || 'USD';
-  const inventoryQuantity = (p.inventory && p.inventory.availableQuantity) || p.quantity || (variants[0] && variants[0].inventoryQuantity) || 0;
-  const image = (p.media && p.media.length && p.media[0].url) || (p.images && p.images[0] && p.images[0].url) || null;
+  // Wix product object is rich; this normalizer attempts to extract the fields we need
+  const id = p.id || p._id || p._uid || p.productId || p.uid || ''; // primary key
+  const title = p.name || p.title || p.productName || '';
+
+  // Images: Wix may return multiple images in different arrays
+  let image = null;
+  if (Array.isArray(p.media) && p.media.length) image = p.media[0].url || image;
+  if (!image && Array.isArray(p.images) && p.images.length) image = p.images[0].url || image;
+  if (!image && p.image) image = p.image;
+
+  // Price / currency: single product may have price, priceRange, or variant prices
+  const price = (p.price && p.price.amount) || (p.priceRange && p.priceRange.min) || null;
+  const currency = (p.price && p.price.currency) || p.currency || (p.priceRange && p.priceRange.currency) || 'USD';
+
+  // Inventory: product inventory might be at product.level or per variant
+  const inventoryQuantity = (p.inventory && p.inventory.availableQuantity) || p.stock || 0;
+
+  // Normalize variants: align common fields - id, sku, price, inventory, attributes
+  const variants = (p.variants || []).map((v) => {
+    const vid = v.id || v._id || v.sku || null;
+    const sku = v.sku || v.skuCode || null;
+    const vPrice = (v.price && v.price.amount) || v.price || null;
+    const vCurrency = (v.price && v.price.currency) || currency;
+    const inventoryQty = (v.inventory && v.inventory.availableQuantity) || v.stock || null;
+    // attributes: Wix variant options may be stored in optionValues
+    const attributes = (v.optionValues || []).map((ov) => ({ id: ov.optionId || ov.optionKey, label: ov.value }));
+    return { id: vid, sku, price: vPrice, currency: vCurrency, inventoryQuantity: inventoryQty, attributes };
+  });
+
+  // SKU fallback: product level SKU or first variant sku
   const sku = p.sku || (variants[0] && variants[0].sku) || null;
 
   return { id, title, sku, price, currency, inventoryQuantity, image, variants };
