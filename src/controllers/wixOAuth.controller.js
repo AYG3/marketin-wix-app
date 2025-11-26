@@ -1,7 +1,8 @@
 const axios = require('axios');
 const wixApi = require('../services/wixApi.service');
 const injectService = require('../services/inject.service');
-const knex = require('../db/knex');
+const knex = require('../db');
+const { encrypt } = require('../utils/crypto');
 
 // Redirect user to Wix OAuth consent
 exports.redirectToWix = async (req, res) => {
@@ -24,8 +25,8 @@ exports.handleCallback = async (req, res) => {
     // Save token to DB. Include site_id & instance_id if provided.
     const tokenRecord = {
       wix_client_id: tokenResp.client_id || process.env.WIX_CLIENT_ID || 'unknown',
-      access_token: tokenResp.access_token,
-      refresh_token: tokenResp.refresh_token,
+      access_token: encrypt(tokenResp.access_token),
+      refresh_token: encrypt(tokenResp.refresh_token),
       expires_at: tokenResp.expires_at || null,
       site_id: tokenResp.site_id || null,
       instance_id: tokenResp.instance_id || null,

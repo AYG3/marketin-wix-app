@@ -6,13 +6,17 @@ process.env.WIX_CLIENT_ID = process.env.WIX_CLIENT_ID || 'test-client-id';
 
 const request = require('supertest');
 const app = require('../src/app');
-const knex = require('../src/db/knex');
+const knex = require('../src/db');
 const fs = require('fs');
 
-// ensure a clean slate before running tests
+// ensure a clean slate before running tests and run migrations
 if (fs.existsSync(process.env.DB_FILENAME)) {
   try { fs.unlinkSync(process.env.DB_FILENAME); } catch (e) {}
 }
+
+beforeAll(async () => {
+  await knex.migrate.latest();
+});
 
 // Mock wixApi module to avoid real HTTP calls
 // Mock wixApi functions
@@ -52,6 +56,30 @@ describe('Wix OAuth endpoints', () => {
     expect(row.injected).toBeTruthy();
     expect(row.injected_at).not.toBeNull();
   });
+
+  test('on success: injection_attempts incremented and status = success', async () => {
+    await knex('wix_tokens').del();
+    await request(app).get('/auth/callback').query({ code: 'testcode' });
+    const row = await knex('wix_tokens').where({ site_id: 'mock-site-id' }).first();
+    expect(row.injection_attempts).toBeGreaterThanOrEqual(1);
+    expect(row.injection_status).toBe('success');
+  });
+
+  test('on failure: injection_attempts = max retries, status = failed, injected=false', async () => {
+    // arrange: make injectHeadScript fail
+    const wixApi = require('../src/services/wixApi.service');
+    wixApi.injectHeadScript.mockImplementation(async () => { throw new Error('injection failed'); });
+
+    await knex('wix_tokens').del();
+    const res = await request(app).get('/auth/callback').query({ code: 'testcode' });
+    // callback will still respond with 200 (injection is attempted async within handler),
+    // but DB should be updated to reflect failed injection attempts
+    expect(res.status).toBe(200);
+    const row = await knex('wix_tokens').where({ site_id: 'mock-site-id' }).first();
+    expect(row.injection_attempts).toBeGreaterThanOrEqual(3);
+    expect(row.injection_status).toBe('failed');
+    expect(row.injected).toBeFalsy();
+  });
 });
 
 afterAll(async () => {
@@ -61,6 +89,7 @@ afterAll(async () => {
   } catch (err) {
     // ignore
   }
-  // remove DB file
+  // rollback migrations and remove DB file
+  try { await knex.migrate.rollback(); } catch (e) {}
   try { if (fs.existsSync(process.env.DB_FILENAME)) fs.unlinkSync(process.env.DB_FILENAME); } catch (e) {}
 });

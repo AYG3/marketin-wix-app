@@ -1,5 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
+let wixSdk = null;
+try { wixSdk = require('@wix/sdk'); } catch (e) { wixSdk = null; }
 
 const exchangeCodeForToken = async (code) => {
   // If WIX_CLIENT_SECRET is present, perform a real exchange with Wix API
@@ -52,6 +54,24 @@ const injectHeadScript = async ({ siteId, token, content }) => {
   // Placeholder implementation for injecting head script into a Wix site
   // Wix Admin APIs typically require an Authorization header with the access token.
   // This is a best-effort emulation using a Wix-like endpoint pattern.
+  // Prefer using Wix SDK if available
+  if (wixSdk && typeof wixSdk.createClient === 'function') {
+    try {
+      // create a client with OAuthStrategy using the provided token (if supported by the SDK)
+      // Note: This is a best-effort integration; adjust based on the SDK version and modules available.
+      const { OAuthStrategy, createClient } = wixSdk;
+      const client = createClient({ auth: OAuthStrategy({ accessToken: token }) });
+      if (client.sites && client.sites.htmlInjections && typeof client.sites.htmlInjections.create === 'function') {
+        const resp = await client.sites.htmlInjections.create(siteId, { html: content, position: 'head' });
+        return resp;
+      }
+    } catch (err) {
+      console.error('wix sdk injectHeadScript error', err?.response?.data || err.message || err);
+      // fallback to REST below
+    }
+  }
+
+  // Fallback: HTTP POST to Wix Admin REST API for HTML injection into the site head
   const endpoint = `https://www.wixapis.com/sites/v1/sites/${siteId}/html-injections`;
   try {
     const resp = await axios.post(endpoint, { content, position: 'head' }, {

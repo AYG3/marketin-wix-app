@@ -32,3 +32,7 @@ Database: SQLite (Knex)
 The scaffold uses Knex with SQLite by default. Configure the database in `.env` using `DB_CLIENT` and `DB_FILENAME`.
 
 To switch to Postgres, set `DB_CLIENT=pg` and provide `DB_CONNECTION` environment variable (e.g. `postgres://user:pass@host:5432/db`).
+
+Token encryption
+
+- You should set `ENCRYPTION_KEY` in `.env` to a unique secret used to encrypt tokens at rest. If not set, tokens will be stored in plaintext (not recommended).

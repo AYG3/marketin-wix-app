@@ -1,4 +1,4 @@
-const knex = require('../db/knex');
+const knex = require('../db');
 
 exports.handleOrderWebhook = async (req, res) => {
   try {

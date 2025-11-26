@@ -7,7 +7,13 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
     ,
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "migrate": "knex --knexfile knexfile.js migrate:latest --env development",
+    "migrate:test": "knex --knexfile knexfile.js migrate:latest --env test",
+    "migrate:rollback": "knex --knexfile knexfile.js migrate:rollback --env development"
+  },
+  "knex": {
+    "migrations": "migrations"
   },
   "author": "",
   "license": "MIT",
