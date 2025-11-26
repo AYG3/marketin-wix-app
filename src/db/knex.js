@@ -39,8 +39,31 @@ const db = knex(config);
         table.text('access_token');
         table.text('refresh_token');
         table.timestamp('expires_at');
+        table.string('site_id');
+        table.string('instance_id');
+        table.boolean('injected').defaultTo(false);
+        table.timestamp('injected_at');
         table.timestamp('created_at');
       });
+    }
+    // Ensure columns exist if table was already created previously
+    if (hasTokens) {
+      const hasSiteColumn = await db.schema.hasColumn('wix_tokens', 'site_id');
+      if (!hasSiteColumn) {
+        await db.schema.table('wix_tokens', (t) => t.string('site_id'));
+      }
+      const hasInstanceColumn = await db.schema.hasColumn('wix_tokens', 'instance_id');
+      if (!hasInstanceColumn) {
+        await db.schema.table('wix_tokens', (t) => t.string('instance_id'));
+      }
+      const hasInjected = await db.schema.hasColumn('wix_tokens', 'injected');
+      if (!hasInjected) {
+        await db.schema.table('wix_tokens', (t) => t.boolean('injected').defaultTo(false));
+      }
+      const hasInjectedAt = await db.schema.hasColumn('wix_tokens', 'injected_at');
+      if (!hasInjectedAt) {
+        await db.schema.table('wix_tokens', (t) => t.timestamp('injected_at'));
+      }
     }
 
     const hasOrderWebhooks = await db.schema.hasTable('order_webhooks');
