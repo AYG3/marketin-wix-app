@@ -7,7 +7,8 @@ const routes = require('./routes');
 const app = express();
 
 app.use(cors());
-app.use(bodyParser.json());
+// capture raw body for webhook signature validation
+app.use(bodyParser.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Health / sanity route
