@@ -5,12 +5,13 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
-    ,
+    "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "migrate": "knex --knexfile knexfile.js migrate:latest --env development",
     "migrate:test": "knex --knexfile knexfile.js migrate:latest --env test",
-    "migrate:rollback": "knex --knexfile knexfile.js migrate:rollback --env development"
+    "migrate:rollback": "knex --knexfile knexfile.js migrate:rollback --env development",
+    "worker": "node src/worker/conversionWorker.js",
+    "worker:once": "node src/worker/conversionWorker.js --once"
   },
   "knex": {
     "migrations": "migrations"
@@ -27,7 +28,8 @@
     "pg": "^8.10.0",
     "sqlite3": "^5.1.0",
     "ioredis": "^5.3.0",
-    "bullmq": "^3.23.0",
+    "bullmq": "^5.0.0",
+    "nodemailer": "^6.9.0",
     "@wix/sdk": "^1.0.0"
   },
   "devDependencies": {

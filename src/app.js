@@ -21,5 +21,7 @@ app.use('/auth', routes.auth);
 app.use('/webhooks', routes.webhooks);
 app.use('/inject', routes.inject);
 app.use('/wix', routes.wix);
+app.use('/track', routes.track);
+app.use('/admin', routes.admin);
 
 module.exports = app;
