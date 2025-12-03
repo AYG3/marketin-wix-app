@@ -109,6 +109,121 @@ exports.trackSession = async (req, res) => {
 };
 
 /**
+ * POST /visitor/identify
+ * Link a visitor session to an email or other identifier (called on signup/checkout)
+ * Body: { sessionId, visitorId, siteId, email, phone, customerId, orderId, affiliateId, campaignId, productId }
+ */
+exports.identifyVisitor = async (req, res) => {
+  try {
+    const {
+      sessionId,
+      visitorId,
+      siteId,
+      email,
+      phone,
+      customerId,
+      orderId,
+      affiliateId,
+      campaignId,
+      productId
+    } = req.body;
+
+    if (!sessionId && !visitorId) {
+      return res.status(400).json({ error: 'sessionId or visitorId required' });
+    }
+
+    // Find existing session
+    let session = null;
+    if (sessionId) {
+      session = await knex('visitor_sessions')
+        .where('session_id', sessionId)
+        .first();
+    }
+    if (!session && visitorId) {
+      session = await knex('visitor_sessions')
+        .where('visitor_id', visitorId)
+        .where(builder => {
+          if (siteId) builder.where('site_id', siteId);
+        })
+        .orderBy('created_at', 'desc')
+        .first();
+    }
+
+    if (session) {
+      // Update existing session with identity info
+      const updates = {
+        updated_at: new Date()
+      };
+      
+      // Update affiliate info if provided (may come from cookie on identify call)
+      if (affiliateId && !session.affiliate_id) updates.affiliate_id = affiliateId;
+      if (campaignId && !session.campaign_id) updates.campaign_id = campaignId;
+      if (productId && !session.product_id) updates.product_id = productId;
+      
+      // Store identity in metadata (email, phone, customerId)
+      const existingMetadata = session.metadata ? JSON.parse(session.metadata) : {};
+      const newMetadata = {
+        ...existingMetadata,
+        email: email || existingMetadata.email,
+        phone: phone || existingMetadata.phone,
+        customerId: customerId || existingMetadata.customerId,
+        orderId: orderId || existingMetadata.orderId,
+        identifiedAt: new Date().toISOString()
+      };
+      updates.metadata = JSON.stringify(newMetadata);
+
+      await knex('visitor_sessions')
+        .where('session_id', session.session_id)
+        .update(updates);
+
+      return res.status(200).json({
+        status: 'identified',
+        sessionId: session.session_id,
+        affiliateId: affiliateId || session.affiliate_id,
+        campaignId: campaignId || session.campaign_id
+      });
+    }
+
+    // No existing session - create new one with identity
+    const newSessionId = sessionId || crypto.randomUUID();
+    const sessionTTLDays = parseInt(process.env.SESSION_TTL_DAYS || '30', 10);
+    const expiresAt = new Date(Date.now() + sessionTTLDays * 24 * 60 * 60 * 1000);
+    const now = new Date().toISOString();
+
+    const metadata = JSON.stringify({
+      email,
+      phone,
+      customerId,
+      orderId,
+      identifiedAt: now
+    });
+
+    await knex('visitor_sessions').insert({
+      session_id: newSessionId,
+      site_id: siteId,
+      visitor_id: visitorId,
+      affiliate_id: affiliateId,
+      campaign_id: campaignId,
+      product_id: productId,
+      metadata,
+      expires_at: expiresAt.toISOString(),
+      created_at: now,
+      updated_at: now
+    });
+
+    res.status(201).json({
+      status: 'created_and_identified',
+      sessionId: newSessionId,
+      affiliateId,
+      campaignId
+    });
+  } catch (err) {
+    console.error('identifyVisitor error', err?.message || err);
+    res.status(500).json({ error: 'Failed to identify visitor' });
+  }
+};
+
+/**
  * GET /track/session/:sessionId
  * Retrieve session info (used internally for order attribution)
  */

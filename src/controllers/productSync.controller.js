@@ -1,7 +1,7 @@
 const wixApi = require('../services/wixApi.service');
 const marketin = require('../services/marketin.service');
 const knex = require('../db');
-const { decrypt } = require('../utils/crypto');
+const tokenService = require('../services/token.service');
 
 exports.syncProducts = async (req, res) => {
   try {
@@ -9,17 +9,19 @@ exports.syncProducts = async (req, res) => {
 
     // fetch access token for site or use provided siteId
     let tokenRow = null;
-    if (siteId) tokenRow = await knex('wix_tokens').where({ site_id: siteId }).first();
+    if (siteId) tokenRow = await knex('wix_tokens').where({ site_id: siteId, is_active: true }).first();
     if (!tokenRow) {
-      tokenRow = await knex('wix_tokens').first();
+      tokenRow = await knex('wix_tokens').where({ is_active: true }).first();
       if (!tokenRow) return res.status(400).json({ error: 'No Wix token found. Connect a Wix site first.' });
     }
 
-    const accessTokenEncrypted = tokenRow && tokenRow.access_token ? tokenRow.access_token : null;
-    const accessToken = accessTokenEncrypted ? (process.env.ENCRYPTION_KEY || process.env.JWT_SECRET ? decrypt(accessTokenEncrypted) : accessTokenEncrypted) : null;
-    if (!accessToken) return res.status(400).json({ error: 'No valid access token found for Wix site.' });
+    const effectiveSiteId = tokenRow.site_id;
 
-    const results = await wixApi.getAllProducts(accessToken, { siteId });
+    // Use token service with automatic refresh on 401
+    const results = await wixApi.withTokenRefresh(
+      async (accessToken) => wixApi.getAllProducts(accessToken, { siteId: effectiveSiteId }),
+      tokenService.getTokenHelpers(effectiveSiteId)
+    );
 
     // Chunked sync: split results into manageable batches (e.g., 50 per request)
     const BATCH_SIZE = Number(process.env.PRODUCT_SYNC_BATCH_SIZE || 50);
@@ -41,7 +43,7 @@ exports.syncProducts = async (req, res) => {
       // If we have Redis/Bull worker enabled, optionally enqueue per-chunk jobs instead
       if (process.env.USE_QUEUE === 'true') {
         const { queue } = require('../worker/productSyncWorker');
-        await queue.add('sync-chunk', { siteId, brandId, apiKey, chunk });
+        await queue.add('sync-chunk', { siteId: effectiveSiteId, brandId, apiKey, chunk });
       }
     }
 

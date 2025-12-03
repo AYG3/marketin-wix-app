@@ -8,8 +8,20 @@ const { encrypt } = require('../utils/crypto');
 exports.redirectToWix = async (req, res) => {
   const clientId = process.env.WIX_CLIENT_ID;
   const redirectUri = process.env.WIX_REDIRECT_URI;
-  const scopes = 'site.read,stores.read,stores.write';
-  const wixOAuthUrl = `https://www.wix.com/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
+  
+  // Use the token from the query if provided (Wix app install flow passes token)
+  const token = req.query.token;
+  
+  if (token) {
+    // If Wix passes a token, we can use it directly for the OAuth flow
+    // This is the newer Wix app installation flow
+    const wixOAuthUrl = `https://www.wix.com/installer/install?token=${token}&appId=${clientId}&redirectUrl=${encodeURIComponent(redirectUri)}`;
+    return res.redirect(wixOAuthUrl);
+  }
+  
+  // Fallback to legacy OAuth flow (manual install)
+  // Note: Scopes should match what's configured in Wix Developer Center -> Permissions
+  const wixOAuthUrl = `https://www.wix.com/installer/install?appId=${clientId}&redirectUrl=${encodeURIComponent(redirectUri)}`;
   res.redirect(wixOAuthUrl);
 };
 

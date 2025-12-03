@@ -8,11 +8,78 @@ const { enqueueConversion, processQueue } = require('../services/conversionQueue
 const { findAffiliateByVisitor } = require('./visitorSession.controller');
 
 /**
- * Validate HMAC-SHA256 signature from Wix webhook
+ * Wix Public Key for webhook signature verification
+ * Wix uses RSA public key signatures, not HMAC secrets
+ * Set WIX_PUBLIC_KEY in env or use inline default
  */
-const validateWebhookSignature = (req) => {
+const getWixPublicKey = () => {
+  const envKey = process.env.WIX_PUBLIC_KEY;
+  if (!envKey) return null;
+
+  // Trim surrounding quotes if present (some .env editors wrap values in quotes)
+  let key = envKey.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.substring(1, key.length - 1);
+  }
+
+  // If the value contains literal backslash-n sequences (\n), convert them to real newlines
+  if (key.includes('\\n')) {
+    key = key.replace(/\\n/g, '\n');
+  }
+
+  // Normalize CRLF -> LF
+  key = key.replace(/\r\n/g, '\n');
+
+  // If it's already a PEM with BEGIN header, return
+  if (key.includes('-----BEGIN')) {
+    return key;
+  }
+
+  // Otherwise, assume it's base64 encoded; attempt to decode
+  try {
+    const decoded = Buffer.from(key, 'base64').toString('utf8');
+    if (decoded.includes('-----BEGIN')) return decoded;
+    // If decode didn't contain PEM header, fall back to the raw value (best-effort)
+    return key;
+  } catch (err) {
+    // Not valid base64, just return the raw value
+    return key;
+  }
+};
+
+/**
+ * Validate Wix webhook signature using RSA public key (Wix SDK method)
+ * Wix signs webhooks with their private key; we verify with their public key
+ * 
+ * Signature header: x-wix-signature (base64 encoded)
+ * Algorithm: RSA-SHA256
+ */
+const validateWixPublicKeySignature = (req) => {
+  const publicKey = getWixPublicKey();
+  if (!publicKey) return { valid: false, reason: 'no_public_key_configured' };
+
+  const signature = req.headers['x-wix-signature'];
+  if (!signature) return { valid: false, reason: 'no_signature_header' };
+
+  try {
+    const payload = req.rawBody || Buffer.from(JSON.stringify(req.body));
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(payload);
+    
+    const isValid = verifier.verify(publicKey, signature, 'base64');
+    return { valid: isValid, reason: isValid ? 'public_key_verified' : 'signature_mismatch' };
+  } catch (err) {
+    console.error('RSA signature verification error:', err?.message);
+    return { valid: false, reason: 'verification_error', error: err?.message };
+  }
+};
+
+/**
+ * Validate HMAC-SHA256 signature from Wix webhook (legacy/fallback method)
+ */
+const validateHmacSignature = (req) => {
   const secret = process.env.WIX_WEBHOOK_SECRET || process.env.WIX_CLIENT_SECRET;
-  if (!secret) return true; // no secret configured -> accept by default
+  if (!secret) return { valid: false, reason: 'no_secret_configured' };
 
   const signature = 
     req.headers['x-wix-signature'] || 
@@ -20,7 +87,7 @@ const validateWebhookSignature = (req) => {
     req.headers['x-wix-signature-hmac'] ||
     req.headers['x-wix-hmac'];
   
-  if (!signature) return false;
+  if (!signature) return { valid: false, reason: 'no_signature_header' };
 
   const payload = req.rawBody || Buffer.from(JSON.stringify(req.body));
   const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -30,9 +97,75 @@ const validateWebhookSignature = (req) => {
   const expected = hmac.toLowerCase();
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+    const isValid = crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+    return { valid: isValid, reason: isValid ? 'hmac_verified' : 'hmac_mismatch' };
   } catch {
-    return received === expected;
+    const isValid = received === expected;
+    return { valid: isValid, reason: isValid ? 'hmac_verified' : 'hmac_mismatch' };
+  }
+};
+
+/**
+ * Unified webhook signature validation
+ * Tries public key verification first (Wix's preferred method), falls back to HMAC
+ */
+const validateWebhookSignature = (req) => {
+  // Allow test webhooks in development mode
+  const isTestWebhook = req.headers['x-wix-webhook-test'] === 'true';
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  
+  if (isTestWebhook && isDevelopment) {
+    console.log('⚠️  Test webhook - bypassing signature verification (dev mode only)');
+    return true;
+  }
+  
+  // In development/test mode without any keys, accept all webhooks
+  const publicKey = getWixPublicKey();
+  const hmacSecret = process.env.WIX_WEBHOOK_SECRET || process.env.WIX_CLIENT_SECRET;
+  
+  if (!publicKey && !hmacSecret) {
+    console.log('No webhook verification configured - accepting webhook');
+    return true;
+  }
+
+  // Try RSA public key verification first (Wix's primary method)
+  if (publicKey) {
+    const rsaResult = validateWixPublicKeySignature(req);
+    if (rsaResult.valid) {
+      console.log('Webhook verified via RSA public key');
+      return true;
+    }
+    console.log('RSA verification failed:', rsaResult.reason);
+  }
+
+  // Fallback to HMAC verification
+  if (hmacSecret) {
+    const hmacResult = validateHmacSignature(req);
+    if (hmacResult.valid) {
+      console.log('Webhook verified via HMAC');
+      return true;
+    }
+    console.log('HMAC verification failed:', hmacResult.reason);
+  }
+
+  // Both methods failed
+  return false;
+};
+
+// Helper to safely parse JSON from raw body when a sender uses text/plain
+const getRequestBody = (req) => {
+  // If body is already a parsed object, use it
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) return req.body;
+  // Attempt to parse the raw body (buffer) if present
+  const raw = req.rawBody || req.body || null;
+  if (!raw) return {};
+  try {
+    // Buffer -> string -> JSON parse. If it's already a string that looks like JSON, parse it.
+    const str = Buffer.isBuffer(raw) ? raw.toString('utf8') : (typeof raw === 'string' ? raw : JSON.stringify(raw));
+    return JSON.parse(str);
+  } catch (err) {
+    // Not JSON, return original body or empty
+    return req.body || {};
   }
 };
 
@@ -251,14 +384,16 @@ exports.handleWixOrderWebhook = async (req, res) => {
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
-    // 2. Store raw webhook immediately (for debugging/replay)
-    const [webhookId] = await knex('order_webhooks').insert({
-      payload: JSON.stringify(req.body),
-      created_at: new Date()
-    });
+      // 2. Store raw webhook immediately (for debugging/replay). Parse fallback for text/plain bodies
+      const parsedBody = getRequestBody(req);
+      const webhookPayloadStr = JSON.stringify(parsedBody || {});
+      const [webhookId] = await knex('order_webhooks').insert({
+        payload: webhookPayloadStr,
+        created_at: new Date()
+      });
 
     // 3. Parse order payload
-    const parsedOrder = parseWixOrderPayload(req.body);
+    const parsedOrder = parseWixOrderPayload(parsedBody || req.body || {});
     
     console.log('Parsed Wix order:', {
       orderId: parsedOrder.orderId,
@@ -362,7 +497,8 @@ exports.handleOrderWebhook = async (req, res) => {
 exports.handleTestWebhook = async (req, res) => {
   console.log('=== TEST WEBHOOK RECEIVED ===');
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('Body:', JSON.stringify(req.body, null, 2));
+  const parsedBody = getRequestBody(req);
+  console.log('Body:', JSON.stringify(parsedBody, null, 2));
   console.log('=== END TEST WEBHOOK ===');
   
   // Also store it
@@ -371,7 +507,7 @@ exports.handleTestWebhook = async (req, res) => {
       payload: JSON.stringify({
         _test: true,
         headers: req.headers,
-        body: req.body,
+        body: parsedBody,
         timestamp: new Date().toISOString()
       }),
       created_at: new Date()

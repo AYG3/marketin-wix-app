@@ -7,8 +7,10 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
+    "lint": "echo 'No linter configured'",
     "migrate": "knex --knexfile knexfile.js migrate:latest --env development",
     "migrate:test": "knex --knexfile knexfile.js migrate:latest --env test",
+    "migrate:production": "knex --knexfile knexfile.js migrate:latest --env production",
     "migrate:rollback": "knex --knexfile knexfile.js migrate:rollback --env development",
     "worker": "node src/worker/conversionWorker.js",
     "worker:once": "node src/worker/conversionWorker.js --once"
@@ -19,22 +21,23 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@wix/sdk": "^1.0.0",
     "axios": "^1.0.0",
     "body-parser": "^1.20.0",
+    "bullmq": "^5.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.18.0",
-    "knex": "^2.5.0",
-    "pg": "^8.10.0",
-    "sqlite3": "^5.1.0",
     "ioredis": "^5.3.0",
-    "bullmq": "^5.0.0",
+    "knex": "^2.5.0",
+    "morgan": "^1.10.1",
     "nodemailer": "^6.9.0",
-    "@wix/sdk": "^1.0.0"
+    "pg": "^8.10.0",
+    "sqlite3": "^5.1.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.0",
     "jest": "^29.0.0",
+    "nodemon": "^2.0.0",
     "supertest": "^6.0.0"
   }
 }

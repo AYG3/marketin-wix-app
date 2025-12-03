@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market!N Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">📊</span>
+        <h1>Market!N</h1>
+      </div>
+      <div class="status-badge" id="connection-status">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting...</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Brand Settings Card (Priority) -->
+      <section class="card card-highlight" id="brand-settings-card">
+        <h2>🔧 Setup Required</h2>
+        <p class="card-description">Enter your Market!N Brand ID to enable affiliate tracking on your site.</p>
+        <div class="form-group">
+          <label for="brand-id-input">Market!N Brand ID</label>
+          <div class="input-group">
+            <input type="text" id="brand-id-input" placeholder="Enter your Brand ID" />
+            <button class="btn btn-primary" id="save-brand-btn">
+              <span class="btn-text">Save</span>
+            </button>
+          </div>
+          <small class="form-help">Find your Brand ID in the Market!N dashboard under Settings → Integration</small>
+        </div>
+        <div id="brand-status" class="brand-status"></div>
+      </section>
+
+      <!-- Embedded Script Card (shown after brandId is set) -->
+      <section class="card" id="embed-script-card" style="display: none;">
+        <h2>📋 Embedded Script</h2>
+        <p class="card-description">Add this script to your Wix site via Developer Center → Extensions → Embedded Scripts</p>
+        <div class="code-container">
+          <pre id="embed-script-code"></pre>
+          <button class="btn btn-outline btn-small" id="copy-script-btn">
+            <span class="btn-icon">📋</span>
+            <span class="btn-text">Copy</span>
+          </button>
+        </div>
+        <details class="setup-instructions">
+          <summary>Setup Instructions</summary>
+          <ol id="setup-instructions-list"></ol>
+        </details>
+      </section>
+
+      <!-- Installation Status Card -->
+      <section class="card">
+        <h2>Installation Status</h2>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-label">Brand ID</span>
+            <span class="status-value" id="brand-id-status">
+              <span class="loader-small"></span>
+            </span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Pixel Configured</span>
+            <span class="status-value" id="pixel-status">
+              <span class="loader-small"></span>
+            </span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Products Synced</span>
+            <span class="status-value" id="products-count">
+              <span class="loader-small"></span>
+            </span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Token Status</span>
+            <span class="status-value" id="token-status">
+              <span class="loader-small"></span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Actions Card -->
+      <section class="card">
+        <h2>Quick Actions</h2>
+        <div class="actions-grid">
+          <button class="btn btn-primary" id="sync-products-btn" disabled>
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text">Sync Products</span>
+          </button>
+          <button class="btn btn-secondary" id="refresh-token-btn" disabled>
+            <span class="btn-icon">🔑</span>
+            <span class="btn-text">Refresh Token</span>
+          </button>
+          <button class="btn btn-outline" id="refresh-status-btn">
+            <span class="btn-icon">↻</span>
+            <span class="btn-text">Refresh Status</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Activity Log -->
+      <section class="card">
+        <h2>Activity Log</h2>
+        <div class="log-container" id="activity-log">
+          <div class="log-entry log-info">
+            <span class="log-time">--:--</span>
+            <span class="log-message">Initializing...</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Market!N Affiliate Tracking &copy; 2024</p>
+    </footer>
+  </div>
+
+  <!-- Toast notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

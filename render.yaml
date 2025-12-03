@@ -1,0 +1,151 @@
+# ============================================================
+# Render Blueprint - Market!N Wix Integration
+# ============================================================
+# This file defines the infrastructure for staging and production
+# Deploy using: Render Dashboard → New → Blueprint → Connect Repository
+# Docs: https://render.com/docs/blueprint-spec
+# ============================================================
+
+services:
+  # --------------------------
+  # Staging Environment
+  # --------------------------
+  - type: web
+    name: marketin-wix-staging
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: develop
+    buildCommand: npm install && npm run migrate:production
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: 3000
+      - key: APP_URL
+        sync: false  # Set manually in Render dashboard
+      - key: WIX_CLIENT_ID
+        sync: false
+      - key: WIX_CLIENT_SECRET
+        sync: false
+      - key: WIX_REDIRECT_URI
+        sync: false
+      - key: WIX_PUBLIC_KEY
+        sync: false
+      - key: MARKETIN_API_KEY
+        sync: false
+      - key: MARKETIN_API_URL
+        value: https://api.marketin.now/api/v1
+      - key: DB_CLIENT
+        value: pg
+      - key: DATABASE_URL
+        fromDatabase:
+          name: marketin-wix-db-staging
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_API_KEY
+        generateValue: true
+
+  # --------------------------
+  # Production Environment
+  # --------------------------
+  - type: web
+    name: marketin-wix-production
+    runtime: node
+    region: frankfurt
+    plan: starter
+    branch: main
+    buildCommand: npm install && npm run migrate:production
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: APP_URL
+        sync: false  # Set manually in Render dashboard
+      - key: WIX_CLIENT_ID
+        sync: false
+      - key: WIX_CLIENT_SECRET
+        sync: false
+      - key: WIX_REDIRECT_URI
+        sync: false
+      - key: WIX_PUBLIC_KEY
+        sync: false
+      - key: MARKETIN_API_KEY
+        sync: false
+      - key: MARKETIN_API_URL
+        value: https://api.marketin.now/api/v1
+      - key: DB_CLIENT
+        value: pg
+      - key: DATABASE_URL
+        fromDatabase:
+          name: marketin-wix-db-production
+          property: connectionString
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_API_KEY
+        generateValue: true
+      # Email alerts (optional)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: ALERT_EMAIL
+        sync: false
+
+  # --------------------------
+  # Background Worker (Optional)
+  # --------------------------
+  # Uncomment if you need a dedicated worker for processing conversions
+  # - type: worker
+  #   name: marketin-wix-worker
+  #   runtime: node
+  #   region: frankfurt
+  #   branch: main
+  #   buildCommand: npm install
+  #   startCommand: npm run worker
+  #   autoDeploy: true
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: DB_CLIENT
+  #       value: pg
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: marketin-wix-db-production
+  #         property: connectionString
+  #     - key: MARKETIN_API_KEY
+  #       sync: false
+  #     - key: MARKETIN_API_URL
+  #       value: https://api.marketin.now/api/v1
+
+# --------------------------
+# Databases
+# --------------------------
+databases:
+  - name: marketin-wix-db-staging
+    region: frankfurt
+    plan: free
+    databaseName: marketin_wix_staging
+    user: marketin
+
+  - name: marketin-wix-db-production
+    region: frankfurt
+    plan: starter  # Use paid plan for production
+    databaseName: marketin_wix_production
+    user: marketin

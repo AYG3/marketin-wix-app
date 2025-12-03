@@ -11,8 +11,9 @@ jest.mock('../src/services/conversionQueue.service', () => ({
 // Mock visitor session lookup
 jest.mock('../src/controllers/visitorSession.controller', () => ({
   findAffiliateByVisitor: jest.fn().mockResolvedValue(null),
-  trackSession: jest.fn(),
-  getSession: jest.fn()
+  trackSession: jest.fn((req, res) => res.status(200).json({ status: 'ok' })),
+  getSession: jest.fn((req, res) => res.status(404).json({ error: 'not found' })),
+  identifyVisitor: jest.fn((req, res) => res.status(200).json({ status: 'identified' }))
 }));
 
 describe('Order webhook', () => {

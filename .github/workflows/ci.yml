@@ -1,0 +1,155 @@
+# ============================================================
+# GitHub Actions CI/CD Pipeline
+# Market!N Wix Integration
+# ============================================================
+# Runs on every push: lint, test, and optionally deploy to Render
+# ============================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, feature/*]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # --------------------------
+  # Lint & Test
+  # --------------------------
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint --if-present
+        continue-on-error: true  # Don't fail if no lint script
+
+      - name: Run database migrations (test)
+        run: npm run migrate:test
+        env:
+          NODE_ENV: test
+          DB_CLIENT: sqlite3
+          DB_FILENAME: ./data/test.sqlite
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          DB_CLIENT: sqlite3
+          DB_FILENAME: ./data/test.sqlite
+          WIX_CLIENT_ID: test-client-id
+          WIX_CLIENT_SECRET: test-client-secret
+          WIX_REDIRECT_URI: http://localhost:3000/auth/callback
+          ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          APP_URL: https://apocryphal-unsomnolently-lavera.ngrok-free.dev
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # --------------------------
+  # Deploy to Staging
+  # --------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to Render (Staging)
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}" ]; then
+            echo "Triggering Render deploy for staging..."
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}")
+            if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "202" ]; then
+              echo "✅ Deploy triggered successfully (HTTP $RESPONSE)"
+            else
+              echo "❌ Deploy failed (HTTP $RESPONSE)"
+              exit 1
+            fi
+          else
+            echo "⚠️  RENDER_DEPLOY_HOOK_STAGING not configured, skipping deploy"
+          fi
+
+      - name: Notify deployment
+        if: success()
+        run: echo "🚀 Staging deployment triggered for commit ${{ github.sha }}"
+
+  # --------------------------
+  # Deploy to Production
+  # --------------------------
+  deploy-production:
+    name: Deploy to Production
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to Render (Production)
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}" ]; then
+            echo "Triggering Render deploy for production..."
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}")
+            if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "202" ]; then
+              echo "✅ Deploy triggered successfully (HTTP $RESPONSE)"
+            else
+              echo "❌ Deploy failed (HTTP $RESPONSE)"
+              exit 1
+            fi
+          else
+            echo "⚠️  RENDER_DEPLOY_HOOK_PRODUCTION not configured, skipping deploy"
+          fi
+
+      - name: Notify deployment
+        if: success()
+        run: echo "🚀 Production deployment triggered for commit ${{ github.sha }}"
+
+  # --------------------------
+  # Security Audit (Weekly)
+  # --------------------------
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level=high
+        continue-on-error: true  # Report but don't fail
+
+      - name: Check for outdated packages
+        run: npm outdated || true
