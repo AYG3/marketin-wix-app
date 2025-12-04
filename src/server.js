@@ -5,6 +5,11 @@ const PORT = process.env.PORT || 3000;
 console.log('[ENV] NODE_ENV:', process.env.NODE_ENV || 'not set');
 console.log('[ENV] DB_CLIENT:', process.env.DB_CLIENT || 'not set (will auto-detect)');
 console.log('[ENV] DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+if (process.env.DATABASE_URL) {
+  // Show the full URL but redact the password
+  const redactedUrl = process.env.DATABASE_URL.replace(/:[^:@]+@/, ':***@');
+  console.log('[ENV] DATABASE_URL value:', redactedUrl);
+}
 
 // Initialize database before starting server
 const db = require('./db');

@@ -13,7 +13,7 @@ services:
   - type: web
     name: marketin-wix-staging
     runtime: node
-    region: frankfurt
+    region: oregon
     plan: starter
     branch: develop
     buildCommand: npm install && npm run migrate:production
@@ -58,7 +58,7 @@ services:
   - type: web
     name: marketin-wix-production
     runtime: node
-    region: frankfurt
+    region: oregon
     plan: starter
     branch: main
     buildCommand: npm install && npm run migrate:production
@@ -88,7 +88,7 @@ services:
         value: pg
       - key: DATABASE_URL
         fromDatabase:
-          name: marketin-wix-db-production
+          name: marketin-wix-db
           property: connectionString
       - key: ENCRYPTION_KEY
         generateValue: true
@@ -138,14 +138,14 @@ services:
 # Databases
 # --------------------------
 databases:
+  # Staging database (if using separate staging environment)
   - name: marketin-wix-db-staging
-    region: frankfurt
+    region: oregon
     plan: free
     databaseName: marketin_wix_staging
     user: marketin
 
-  - name: marketin-wix-db-production
-    region: frankfurt
-    plan: starter  # Use paid plan for production
-    databaseName: marketin_wix_production
-    user: marketin
+  # Production database - this should already exist as "marketin-wix-db"
+  # If it doesn't exist, Render will create it with these specs
+  # NOTE: The actual database name in Render is "marketin-wix-db" (without -production suffix)
+  # The DATABASE_URL above references this correctly
