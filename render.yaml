@@ -1,62 +1,17 @@
 # ============================================================
 # Render Blueprint - Market!N Wix Integration
 # ============================================================
-# This file defines the infrastructure for staging and production
+# This file defines the infrastructure for production
 # Deploy using: Render Dashboard → New → Blueprint → Connect Repository
 # Docs: https://render.com/docs/blueprint-spec
 # ============================================================
 
 services:
   # --------------------------
-  # Staging Environment
-  # --------------------------
-  - type: web
-    name: marketin-wix-staging
-    runtime: node
-    region: oregon
-    plan: starter
-    branch: develop
-    buildCommand: npm install && npm run migrate:production
-    startCommand: npm start
-    healthCheckPath: /health
-    autoDeploy: true
-    envVars:
-      - key: NODE_ENV
-        value: staging
-      - key: PORT
-        value: 3000
-      - key: APP_URL
-        sync: false  # Set manually in Render dashboard
-      - key: WIX_CLIENT_ID
-        sync: false
-      - key: WIX_CLIENT_SECRET
-        sync: false
-      - key: WIX_REDIRECT_URI
-        sync: false
-      - key: WIX_PUBLIC_KEY
-        sync: false
-      - key: MARKETIN_API_KEY
-        sync: false
-      - key: MARKETIN_API_URL
-        value: https://api.marketin.now/api/v1
-      - key: DB_CLIENT
-        value: pg
-      - key: DATABASE_URL
-        fromDatabase:
-          name: marketin-wix-db-staging
-          property: connectionString
-      - key: ENCRYPTION_KEY
-        generateValue: true
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: ADMIN_API_KEY
-        generateValue: true
-
-  # --------------------------
   # Production Environment
   # --------------------------
   - type: web
-    name: marketin-wix-production
+    name: marketin-wix-app
     runtime: node
     region: oregon
     plan: starter
@@ -86,8 +41,10 @@ services:
         value: https://api.marketin.now/api/v1
       - key: DB_CLIENT
         value: pg
+      # DATABASE_URL must be set manually in Render dashboard
+      # Use INTERNAL URL: postgresql://marketin_wix_db_user:PASSWORD@dpg-d4oj2ua4d50c738u3li0-a/marketin_wix_db
       - key: DATABASE_URL
-        value: postgresql://marketin_wix_db_user:4zPt4FxxbDaN9DR95yUavm8qvfF0L4Et@dpg-d4oj2ua4d50c738u3li0-a/marketin_wix_db
+        sync: false
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: SESSION_SECRET
@@ -106,44 +63,9 @@ services:
       - key: ALERT_EMAIL
         sync: false
 
-  # --------------------------
-  # Background Worker (Optional)
-  # --------------------------
-  # Uncomment if you need a dedicated worker for processing conversions
-  # - type: worker
-  #   name: marketin-wix-worker
-  #   runtime: node
-  #   region: frankfurt
-  #   branch: main
-  #   buildCommand: npm install
-  #   startCommand: npm run worker
-  #   autoDeploy: true
-  #   envVars:
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: DB_CLIENT
-  #       value: pg
-  #     - key: DATABASE_URL
-  #       fromDatabase:
-  #         name: marketin-wix-db-production
-  #         property: connectionString
-  #     - key: MARKETIN_API_KEY
-  #       sync: false
-  #     - key: MARKETIN_API_URL
-  #       value: https://api.marketin.now/api/v1
-
 # --------------------------
 # Databases
 # --------------------------
-databases:
-  # Staging database (if using separate staging environment)
-  - name: marketin-wix-db-staging
-    region: oregon
-    plan: free
-    databaseName: marketin_wix_staging
-    user: marketin
-
-  # Production database - this should already exist as "marketin-wix-db"
-  # If it doesn't exist, Render will create it with these specs
-  # NOTE: The actual database name in Render is "marketin-wix-db" (without -production suffix)
-  # The DATABASE_URL above references this correctly
+# NOTE: Database "marketin-wix-db" already exists as a separate service
+# It will NOT be created by this blueprint
+# Connect to it manually via DATABASE_URL environment variable
