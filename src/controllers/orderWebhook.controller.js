@@ -427,8 +427,16 @@ exports.handleWixOrderWebhook = async (req, res) => {
     console.log('Affiliate resolved:', attribution);
 
     // 6. Build conversion payload
+    // Resolve brandId from the configured token if available
+    const siteId = parsedOrder.siteId;
+    let tokenRow = null;
+    if (siteId) {
+      tokenRow = await knex('wix_tokens').where({ site_id: siteId, is_active: true }).first();
+    }
+    const brandIdFromToken = tokenRow?.brand_id;
     const conversionPayload = {
-      brandId: process.env.MARKETIN_BRAND_ID || parsedOrder.siteId,
+      brandId: brandIdFromToken || process.env.MARKETIN_BRAND_ID || parsedOrder.siteId,
+      siteId: siteId,
       campaignId: attribution.campaignId,
       affiliateId: attribution.affiliateId,
       externalOrderId: parsedOrder.orderId,

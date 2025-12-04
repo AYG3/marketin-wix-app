@@ -17,6 +17,13 @@ exports.syncProducts = async (req, res) => {
 
     const effectiveSiteId = tokenRow.site_id;
 
+    // Determine Market!N API key to use for sync (prefer request-provided; otherwise per-installation key)
+    let apiKeyToUse = apiKey || null;
+    if (!apiKeyToUse && tokenRow && tokenRow.marketin_api_key) {
+      const { decrypt } = require('../utils/crypto');
+      apiKeyToUse = decrypt(tokenRow.marketin_api_key);
+    }
+
     // Use token service with automatic refresh on 401
     const results = await wixApi.withTokenRefresh(
       async (accessToken) => wixApi.getAllProducts(accessToken, { siteId: effectiveSiteId }),
@@ -29,7 +36,7 @@ exports.syncProducts = async (req, res) => {
     for (let i = 0; i < results.length; i += BATCH_SIZE) chunks.push(results.slice(i, i + BATCH_SIZE));
     const syncResults = [];
     for (const chunk of chunks) {
-      const syncResp = await marketin.bulkSyncProducts({ apiKey, brandId, products: chunk });
+      const syncResp = await marketin.bulkSyncProducts({ apiKey: apiKeyToUse, brandId, products: chunk });
       syncResults.push(syncResp);
       // store mappings for this chunk - best-effort
       const mappings = (syncResp && syncResp.products) || syncResp || [];

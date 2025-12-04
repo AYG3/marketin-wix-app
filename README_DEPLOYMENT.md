@@ -207,6 +207,17 @@ Go to **Wix Developers Console** → Your App → **Extensions** → **Dashboard
 | Setting | Value |
 |---------|-------|
 | **Page URL** | `https://your-domain.com/iframe-ui/index.html` |
+### Market!N API Keys per Brand
+
+Market!N API keys are now stored per-installation (per Wix site/brand) for better security and isolation. Brand owners can generate keys from the Market!N Dashboard (Integrations → API Keys) and paste them into the Wix App dashboard:
+
+1. Open your Wix site's Market!N dashboard (iframe UI)
+2. Go to **Settings** → **Brand Settings**
+3. Paste your **Market!N API Key** in the field and click **Save Key**
+4. The key is encrypted and stored for this installation only; it will be used for product sync and conversion reporting.
+
+Note: If no per-brand key is set, the app will fall back to a global `MARKETIN_API_KEY` value in environment variables (not recommended for multi-tenant setups).
+
 
 ### 4. Embedded Script Extension
 

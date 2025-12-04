@@ -83,7 +83,31 @@ const processQueue = async (batchSize = 10) => {
 
     try {
       const payload = JSON.parse(job.payload);
-      const response = await sendConversionDirect(payload);
+
+      // Resolve per-installation Market!N API key: try by brandId then siteId
+      let apiKeyToUse = null;
+      try {
+        const siteId = payload.siteId || null;
+        const brandId = payload.brandId || null;
+        let tokenRow = null;
+        if (brandId) {
+          tokenRow = await knex('wix_tokens').where({ brand_id: String(brandId), is_active: true }).first();
+        }
+        if (!tokenRow && siteId) {
+          tokenRow = await knex('wix_tokens').where({ site_id: siteId, is_active: true }).first();
+        }
+        if (tokenRow && tokenRow.marketin_api_key) {
+          // decrypt using secure util
+          const { decrypt } = require('../utils/crypto');
+          apiKeyToUse = decrypt(tokenRow.marketin_api_key);
+          // Ensure payload brandId is the configured brand ID
+          if (tokenRow.brand_id) payload.brandId = tokenRow.brand_id;
+        }
+      } catch (err) {
+        console.warn('Failed to resolve Market!N API key for job', job.job_id, err?.message || err);
+      }
+
+      const response = await sendConversionDirect(payload, apiKeyToUse);
 
       // Success!
       await knex('conversion_queue')

@@ -82,7 +82,12 @@ describe('Conversion Queue Service', () => {
       affiliateId: 'AFF-003'
     };
 
-    await enqueueConversion(payload);
+    // insert token row with per-brand API key
+    const { encrypt } = require('../src/utils/crypto');
+    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: encrypt('token'), refresh_token: encrypt('r'), site_id: 'success-site', brand_id: 123, marketin_api_key: encrypt('per-brand-key'), created_at: new Date() });
+
+    // Enqueue with siteId so processQueue knows which token to use
+    await enqueueConversion({ ...payload, siteId: 'success-site' });
     const result = await processQueue(10);
 
     expect(result.processed).toBe(1);
@@ -92,6 +97,10 @@ describe('Conversion Queue Service', () => {
     // Job should be marked completed
     const job = await knex('conversion_queue').where('job_id', `conv_123_order-success`).first();
     expect(job.status).toBe('completed');
+    // Ensure sendConversionDirect was called with the per-brand key
+    expect(marketinService.sendConversionDirect).toHaveBeenCalled();
+    const callArgs = marketinService.sendConversionDirect.mock.calls[0];
+    expect(callArgs[1]).toBe('per-brand-key');
   });
 
   test('processQueue retries failed jobs with backoff', async () => {

@@ -14,7 +14,7 @@ describe('product sync chunking', () => {
   test('chunked sync enqueues and creates mapping', async () => {
     await knex('wix_tokens').del();
     const { encrypt } = require('../src/utils/crypto');
-    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: encrypt('token'), refresh_token: encrypt('r'), site_id: 'chunk-site', created_at: new Date() });
+    await knex('wix_tokens').insert({ wix_client_id: 'mock', access_token: encrypt('token'), refresh_token: encrypt('r'), site_id: 'chunk-site', marketin_api_key: encrypt('test-marketin-key'), created_at: new Date() });
     const wixApi = require('../src/services/wixApi.service');
     // generate a lot of products to force chunking
     const products = [];

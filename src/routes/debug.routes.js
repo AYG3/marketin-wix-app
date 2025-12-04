@@ -334,4 +334,26 @@ router.get('/env', (req, res) => {
   });
 });
 
+/**
+ * POST /debug/update-settings
+ * Test settings update without Wix auth (dev only)
+ */
+router.post('/update-settings', async (req, res) => {
+  const { siteId, brandId, brandName, marketinApiKey } = req.body;
+  
+  if (!siteId) {
+    return res.status(400).json({ error: 'siteId required' });
+  }
+  
+  // Import controller function
+  const iframeController = require('../controllers/iframe.controller');
+  
+  // Create mock request/response
+  req.wixSiteId = siteId;
+  req.body.siteId = siteId;
+  
+  // Call the actual updateSettings function
+  return iframeController.updateSettings(req, res);
+});
+
 module.exports = router;

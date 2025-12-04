@@ -11,6 +11,7 @@
   let instanceData = null;
   let siteId = null;
   let currentBrandId = null;
+  let apiKeySet = false;
 
   // DOM Elements
   const elements = {
@@ -27,6 +28,8 @@
     // Brand settings elements
     brandSettingsCard: document.getElementById('brand-settings-card'),
     brandIdInput: document.getElementById('brand-id-input'),
+    marketinApiKeyInput: document.getElementById('marketin-api-key'),
+    saveApiKeyBtn: document.getElementById('save-api-key-btn'),
     saveBrandBtn: document.getElementById('save-brand-btn'),
     brandStatus: document.getElementById('brand-status'),
     // Embedded script elements
@@ -232,6 +235,17 @@
         currentBrandId = data.brandId;
         elements.brandIdInput.value = data.brandId;
         elements.brandIdStatus.innerHTML = `<span class="status-value success">${data.brandId}</span>`;
+                // API Key state
+                if (data.marketinApiKeySet) {
+                  apiKeySet = true;
+                  // Mask the API key input with a placeholder
+                  if (elements.marketinApiKeyInput) {
+                    elements.marketinApiKeyInput.value = '••••••••••••••';
+                  }
+                  if (elements.saveApiKeyBtn) {
+                    elements.saveApiKeyBtn.textContent = 'Update Key';
+                  }
+                }
         
         // Update card state
         elements.brandSettingsCard.classList.add('configured');
@@ -386,6 +400,45 @@
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<span class="btn-text">Save</span>';
+    }
+  }
+
+  /**
+   * Handle saving Market!N API Key
+   */
+  async function handleSaveApiKey() {
+    const key = elements.marketinApiKeyInput.value.trim();
+    if (!key) {
+      showBrandStatus('Please enter your Market!N API key', 'error');
+      return;
+    }
+    const btn = elements.saveApiKeyBtn;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-text">Saving...</span>';
+    log('Saving Market!N API key...', 'info');
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/iframe/settings`, {
+        method: 'POST',
+        headers: getApiHeaders(),
+        body: JSON.stringify({ siteId: siteId, marketinApiKey: key })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+
+      apiKeySet = true;
+      // Mask value
+      elements.marketinApiKeyInput.value = '••••••••••••••';
+      showBrandStatus('Market!N API key saved successfully', 'success');
+      log('Market!N API key saved', 'success');
+      showToast('API key saved!', 'success');
+    } catch (err) {
+      console.error('Failed to save API key:', err);
+      showBrandStatus(err.message, 'error');
+      log('Failed to save Market!N API key', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="btn-text">Save Key</span>';
     }
   }
 
@@ -547,6 +600,7 @@
     
     // Brand settings event listeners
     elements.saveBrandBtn.addEventListener('click', handleSaveBrandId);
+    if (elements.saveApiKeyBtn) elements.saveApiKeyBtn.addEventListener('click', handleSaveApiKey);
     elements.brandIdInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') handleSaveBrandId();
     });

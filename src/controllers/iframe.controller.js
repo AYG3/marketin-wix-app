@@ -4,6 +4,7 @@
  */
 const knex = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
+const marketinService = require('../services/marketin.service');
 const injectService = require('../services/inject.service');
 const wixApi = require('../services/wixApi.service');
 const crypto = require('crypto');
@@ -357,6 +358,7 @@ exports.getSettings = async (req, res) => {
       brandId: tokenRow.brand_id || null,
       brandName: tokenRow.brand_name || null,
       brandConfiguredAt: tokenRow.brand_configured_at || null,
+      marketinApiKeySet: !!tokenRow.marketin_api_key,
       siteId: tokenRow.site_id
     });
     
@@ -368,22 +370,14 @@ exports.getSettings = async (req, res) => {
 
 /**
  * POST /admin/iframe/settings
- * Updates settings including brandId
+ * Updates settings including brandId and/or marketinApiKey
+ * - brandId is required if not already set in DB
+ * - marketinApiKey can be updated independently once brandId is set
  */
 exports.updateSettings = async (req, res) => {
   try {
     const siteId = req.body.siteId || req.wixSiteId;
-    const { brandId, brandName } = req.body;
-    
-    if (!brandId) {
-      return res.status(400).json({ error: 'brandId is required' });
-    }
-    
-    // Validate brandId format (should be a number or numeric string)
-    const brandIdStr = String(brandId).trim();
-    if (!brandIdStr || brandIdStr === 'YOUR_BRAND_ID' || brandIdStr === 'YOUR_BRAND_ID_HERE') {
-      return res.status(400).json({ error: 'Please enter a valid Market!N Brand ID' });
-    }
+    const { brandId, brandName, marketinApiKey } = req.body;
     
     const tokenRow = await findTokenForSite(siteId);
     
@@ -391,26 +385,75 @@ exports.updateSettings = async (req, res) => {
       return res.status(404).json({ error: 'No installation found' });
     }
     
+    // Determine effective brandId: from request or existing in DB
+    let effectiveBrandId = null;
+    
+    if (brandId) {
+      // Validate brandId format if provided
+      const brandIdStr = String(brandId).trim();
+      if (brandIdStr === 'YOUR_BRAND_ID' || brandIdStr === 'YOUR_BRAND_ID_HERE') {
+        return res.status(400).json({ error: 'Please enter a valid Market!N Brand ID' });
+      }
+      effectiveBrandId = brandIdStr;
+    } else if (tokenRow.brand_id) {
+      // Use existing brandId from DB
+      effectiveBrandId = tokenRow.brand_id;
+    }
+    
+    // brandId is required if neither request nor DB has it
+    if (!effectiveBrandId) {
+      return res.status(400).json({ error: 'brandId is required' });
+    }
+    
+    // Prepare update fields
+    const updateFields = {};
+    
+    // Only update brandId/brandName if provided in request
+    if (brandId) {
+      updateFields.brand_id = effectiveBrandId;
+      updateFields.brand_name = brandName || null;
+      updateFields.brand_configured_at = new Date();
+    }
+
+    // If marketinApiKey provided, validate it and encrypt before storing
+    if (marketinApiKey && String(marketinApiKey).trim()) {
+      // Validate against Market!N API before saving
+      try {
+        const validation = await marketinService.validateApiKey(marketinApiKey);
+        if (validation.valid === false) {
+          return res.status(400).json({ error: 'Invalid Market!N API key' });
+        }
+        // Note: validation.valid === null => could not validate (network); we still allow saving but warn
+        updateFields.marketin_api_key = encrypt(marketinApiKey);
+      } catch (err) {
+        // Network errors or other issues; accept the key but log
+        console.warn('Market!N API key validation error - saving key but could not validate', err?.message || err);
+        updateFields.marketin_api_key = encrypt(marketinApiKey);
+      }
+    }
+    
+    // Only update if there's something to update
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ error: 'No settings to update' });
+    }
+
     // Update the brand settings
     await knex('wix_tokens')
       .where({ id: tokenRow.id })
-      .update({
-        brand_id: brandIdStr,
-        brand_name: brandName || null,
-        brand_configured_at: new Date()
-      });
+      .update(updateFields);
     
-    // Generate the embedded script with the new brandId
-    const scriptInfo = injectService.getEmbeddedScriptInfo(brandIdStr);
+    // Generate the embedded script with the effective brandId
+    const scriptInfo = injectService.getEmbeddedScriptInfo(effectiveBrandId);
     
     res.json({
       ok: true,
       message: 'Settings saved successfully',
-      brandId: brandIdStr,
-      brandName: brandName || null,
+      brandId: effectiveBrandId,
+      brandName: brandName || tokenRow.brand_name || null,
       snippet: scriptInfo.snippet,
       instructions: scriptInfo.instructions
     });
+    
     
   } catch (err) {
     console.error('updateSettings error:', err.message);
