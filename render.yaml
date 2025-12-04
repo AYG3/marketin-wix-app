@@ -43,6 +43,7 @@ services:
         value: pg
       - key: DATABASE_URL
         value: postgresql://marketin_wix_db_user:4zPt4FxxbDaN9DR95yUavm8qvfF0L4Et@dpg-d4oj2ua4d50c738u3li0-a.oregon-postgres.render.com:5432/marketin_wix_db?ssl=true
+        sync: true  # Force Blueprint to override dashboard value
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: SESSION_SECRET
