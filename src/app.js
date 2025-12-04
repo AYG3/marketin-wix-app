@@ -49,10 +49,12 @@ app.get('/health', async (req, res) => {
       uptime: process.uptime()
     });
   } catch (err) {
+    console.error('Health check failed:', err.message || err);
     res.status(503).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      error: err.message
+      error: err.message || 'Unknown database error',
+      details: process.env.NODE_ENV === 'development' ? err.toString() : undefined
     });
   }
 });
