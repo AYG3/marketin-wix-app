@@ -41,10 +41,8 @@ services:
         value: https://api.marketin.now/api/v1
       - key: DB_CLIENT
         value: pg
-      # DATABASE_URL must be set manually in Render dashboard
-      # Use INTERNAL URL: postgresql://marketin_wix_db_user:PASSWORD@dpg-d4oj2ua4d50c738u3li0-a/marketin_wix_db
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://marketin_wix_db_user:4zPt4FxxbDaN9DR95yUavm8qvfF0L4Et@dpg-d4oj2ua4d50c738u3li0-a.oregon-postgres.render.com:5432/marketin_wix_db?ssl=true
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: SESSION_SECRET
