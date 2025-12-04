@@ -61,7 +61,7 @@ services:
     region: oregon
     plan: starter
     branch: main
-    buildCommand: npm install && npm run migrate:production
+    buildCommand: npm install && echo "=== Running Migrations ===" && npm run migrate:production && echo "=== Migrations Complete ==="
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
