@@ -7,15 +7,25 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 
+// Log diagnostic info
+console.log('[DB] Initializing database connection...');
+console.log('[DB] DB_CLIENT env:', process.env.DB_CLIENT || 'not set');
+console.log('[DB] DATABASE_URL:', process.env.DATABASE_URL ? 'present' : 'missing');
+console.log('[DB] NODE_ENV:', process.env.NODE_ENV || 'not set');
+
 // Determine client: prioritize DB_CLIENT env var, then auto-detect from DATABASE_URL
 let client = process.env.DB_CLIENT;
 if (!client) {
   // Auto-detect based on DATABASE_URL presence
   if (process.env.DATABASE_URL) {
     client = 'pg';
+    console.log('[DB] Auto-detected PostgreSQL from DATABASE_URL');
   } else {
     client = 'sqlite3';
+    console.log('[DB] Defaulting to SQLite (no DATABASE_URL found)');
   }
+} else {
+  console.log('[DB] Using explicit DB_CLIENT:', client);
 }
 
 // Build connection config based on client type
@@ -32,19 +42,24 @@ if (client === 'sqlite3') {
     console.error('Could not create sqlite data dir', err);
   }
   connection = { filename };
+  console.log('[DB] SQLite file:', filename);
 } else {
   // PostgreSQL - prioritize DATABASE_URL (Render), then DB_CONNECTION
   const connectionString = process.env.DATABASE_URL || process.env.DB_CONNECTION || '';
   
   if (!connectionString) {
-    throw new Error('DATABASE_URL or DB_CONNECTION environment variable is required for PostgreSQL');
+    const error = 'DATABASE_URL or DB_CONNECTION environment variable is required for PostgreSQL';
+    console.error('[DB] ERROR:', error);
+    throw new Error(error);
   }
+  
+  const sslEnabled = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
+  console.log('[DB] PostgreSQL connection:', connectionString.replace(/:[^@]*@/, ':***@'));
+  console.log('[DB] SSL enabled:', sslEnabled);
   
   connection = {
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' 
-      ? { rejectUnauthorized: false } 
-      : false
+    ssl: sslEnabled ? { rejectUnauthorized: false } : false
   };
 }
 

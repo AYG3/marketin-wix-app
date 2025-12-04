@@ -11,15 +11,21 @@ if (!DB_CLIENT) {
 const DB_FILENAME = process.env.DB_FILENAME || './data/dev.sqlite';
 const DB_CONNECTION = process.env.DATABASE_URL || process.env.DB_CONNECTION || '';
 
+console.log('[Knexfile] DB_CLIENT:', DB_CLIENT);
+console.log('[Knexfile] DATABASE_URL:', DB_CONNECTION ? 'present' : 'missing');
+console.log('[Knexfile] NODE_ENV:', process.env.NODE_ENV || 'development');
+
 // Build connection config based on client type
 const getConnection = (client) => {
   if (client === 'sqlite3') {
     return { filename: DB_FILENAME };
   }
   // PostgreSQL - use connection string
+  const sslEnabled = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
+  console.log('[Knexfile] SSL enabled:', sslEnabled);
   return {
     connectionString: DB_CONNECTION,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: sslEnabled ? { rejectUnauthorized: false } : false
   };
 };
 
