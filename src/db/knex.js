@@ -67,16 +67,32 @@ const config = {
   client,
   connection,
   pool: {
-    min: Number(process.env.DB_POOL_MIN || 2),
-    max: Number(process.env.DB_POOL_MAX || 10),
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    min: Number(process.env.DB_POOL_MIN || 0),
+    max: Number(process.env.DB_POOL_MAX || 5),
+    idleTimeoutMillis: 60000,
+    connectionTimeoutMillis: 15000,  // Increased for Render's network
   },
-  acquireConnectionTimeout: 10000,
+  acquireConnectionTimeout: 30000,  // Increased for Render
   useNullAsDefault: true,
 };
 
 const db = Knex(config);
+
+// Test connection on startup for production
+if (process.env.NODE_ENV === 'production' && client === 'pg') {
+  console.log('[DB] Testing connection on startup...');
+  db.raw('SELECT 1')
+    .then(() => {
+      console.log('[DB] ✓ Connection test successful');
+    })
+    .catch((err) => {
+      console.error('[DB] ✗ Connection test failed:');
+      console.error('[DB]   Error:', err.message || err.code);
+      console.error('[DB]   Code:', err.code);
+      console.error('[DB]   Attempting to continue with connection pool...');
+      // Don't exit immediately - let pool handle it
+    });
+}
 
 // Log connection details on startup (redact password)
 if (process.env.NODE_ENV !== 'test') {
