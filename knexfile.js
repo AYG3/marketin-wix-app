@@ -3,8 +3,11 @@ require('dotenv').config();
 const path = require('path');
 
 // Database configuration
-// Priority: DATABASE_URL (Render) > DB_CONNECTION > SQLite default
-const DB_CLIENT = process.env.DB_CLIENT || (process.env.DATABASE_URL ? 'pg' : 'sqlite3');
+// Priority: DB_CLIENT env var > auto-detect from DATABASE_URL > SQLite default
+let DB_CLIENT = process.env.DB_CLIENT;
+if (!DB_CLIENT) {
+  DB_CLIENT = process.env.DATABASE_URL ? 'pg' : 'sqlite3';
+}
 const DB_FILENAME = process.env.DB_FILENAME || './data/dev.sqlite';
 const DB_CONNECTION = process.env.DATABASE_URL || process.env.DB_CONNECTION || '';
 
